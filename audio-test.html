@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Audio Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        #player {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #trackInfo {
+            margin-top: 10px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div id="player">
+        <button id="playPauseBtn">Play</button>
+        <button id="nextBtn">Next</button>
+        <div id="trackInfo"></div>
+    </div>
+
+    <script>
+        const audioFiles = [
+            'audio1.mp3',
+            'audio2.mp3',
+            'audio3.mp3'
+        ];
+
+        let currentTrack = 0;
+        let audio = new Audio();
+        let isPlaying = false;
+
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const trackInfo = document.getElementById('trackInfo');
+
+        function loadTrack(index) {
+            audio.src = audioFiles[index];
+            audio.load();
+            updateTrackInfo();
+        }
+
+        function playPause() {
+            if (isPlaying) {
+                audio.pause();
+                playPauseBtn.textContent = 'Play';
+            } else {
+                audio.play();
+                playPauseBtn.textContent = 'Pause';
+            }
+            isPlaying = !isPlaying;
+        }
+
+        function nextTrack() {
+            currentTrack = (currentTrack + 1) % audioFiles.length;
+            loadTrack(currentTrack);
+            if (isPlaying) {
+                audio.play();
+            }
+        }
+
+        function updateTrackInfo() {
+            trackInfo.textContent = `Playing: ${audioFiles[currentTrack]}`;
+        }
+
+        audio.addEventListener('ended', nextTrack);
+
+        playPauseBtn.addEventListener('click', playPause);
+        nextBtn.addEventListener('click', nextTrack);
+
+        // MediaSession API設定
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.setActionHandler('play', playPause);
+            navigator.mediaSession.setActionHandler('pause', playPause);
+            navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+        }
+
+        // 初期トラックのロード
+        loadTrack(currentTrack);
+    </script>
+</body>
+</html>
