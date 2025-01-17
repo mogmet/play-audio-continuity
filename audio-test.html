@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local Audio Player</title>
+    <title>Audio Player with Transition Sounds</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -33,70 +33,121 @@
     </style>
 </head>
 <body>
-    <div id="player">
-        <button id="playPauseBtn">Play</button>
-        <button id="nextBtn">Next</button>
-        <div id="trackInfo"></div>
-    </div>
+<div id="player">
+    <button id="playPauseBtn">Play</button>
+    <button id="nextBtn">Next</button>
+    <div id="trackInfo"></div>
+</div>
 
-    <script>
-        const audioFiles = [
-            'audio1.mp3',
-            'audio2.mp3',
-            'audio3.mp3'
-        ];
+<script>
+    const audioFiles = [
+        'audio1.mp3',
+        'audio2.mp3',
+        'audio3.mp3'
+    ];
 
-        let currentTrack = 0;
-        let audio = new Audio();
-        let isPlaying = false;
+    // トランジション用のSEファイル
+    const transitionSound = 'transition.mp3';  // SEファイルのパス
 
-        const playPauseBtn = document.getElementById('playPauseBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        const trackInfo = document.getElementById('trackInfo');
+    let currentTrack = 0;
+    let mainAudio = new Audio();
+    let transitionAudio = new Audio(transitionSound);
+    let isPlaying = false;
+    let isTransitioning = false;
 
-        function loadTrack(index) {
-            audio.src = audioFiles[index];
-            audio.load();
-            updateTrackInfo();
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const trackInfo = document.getElementById('trackInfo');
+
+    function loadTrack(index) {
+        mainAudio.src = audioFiles[index];
+        mainAudio.load();
+        updateTrackInfo();
+    }
+
+    function playPause() {
+        if (isPlaying) {
+            mainAudio.pause();
+            playPauseBtn.textContent = 'Play';
+        } else {
+            mainAudio.play();
+            playPauseBtn.textContent = 'Pause';
+        }
+        isPlaying = !isPlaying;
+    }
+
+    async function playTransitionAndNext() {
+        if (isTransitioning) return;
+        isTransitioning = true;
+
+        // 現在のトラックをフェードアウト
+        const fadeOutDuration = 1000; // 1秒
+        const fadeOutInterval = 50;
+        const volumeStep = fadeOutInterval / fadeOutDuration;
+
+        for (let volume = mainAudio.volume; volume > 0; volume -= volumeStep) {
+            mainAudio.volume = Math.max(0, volume);
+            await new Promise(resolve => setTimeout(resolve, fadeOutInterval));
         }
 
-        function playPause() {
-            if (isPlaying) {
-                audio.pause();
-                playPauseBtn.textContent = 'Play';
-            } else {
-                audio.play();
-                playPauseBtn.textContent = 'Pause';
-            }
-            isPlaying = !isPlaying;
+        mainAudio.pause();
+        mainAudio.volume = 1;
+
+        // トランジションSEを再生
+        transitionAudio.currentTime = 0;
+        try {
+            await transitionAudio.play();
+            // SEの再生が終わるのを待つ
+            await new Promise(resolve => {
+                transitionAudio.onended = resolve;
+            });
+        } catch (error) {
+            console.error('Transition sound playback failed:', error);
         }
 
-        function nextTrack() {
-            currentTrack = (currentTrack + 1) % audioFiles.length;
-            loadTrack(currentTrack);
-            if (isPlaying) {
-                audio.play();
-            }
-        }
-
-        function updateTrackInfo() {
-            trackInfo.textContent = `Playing: ${audioFiles[currentTrack]}`;
-        }
-
-        audio.addEventListener('ended', nextTrack);
-
-        playPauseBtn.addEventListener('click', playPause);
-        nextBtn.addEventListener('click', nextTrack);
-
-        // MediaSession API設定
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.setActionHandler('play', playPause);
-            navigator.mediaSession.setActionHandler('pause', playPause);
-            navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
-        }
-
-        // 初期トラックのロード
+        // 次のトラックを準備して再生
+        currentTrack = (currentTrack + 1) % audioFiles.length;
         loadTrack(currentTrack);
-    </script>
+        if (isPlaying) {
+            try {
+                await mainAudio.play();
+            } catch (error) {
+                console.error('Main audio playback failed:', error);
+            }
+        }
+
+        isTransitioning = false;
+    }
+
+    function updateTrackInfo() {
+        trackInfo.textContent = `Playing: ${audioFiles[currentTrack]}`;
+    }
+
+    // トラック終了時のイベントハンドラ
+    mainAudio.addEventListener('ended', playTransitionAndNext);
+
+    playPauseBtn.addEventListener('click', playPause);
+    nextBtn.addEventListener('click', playTransitionAndNext);
+
+    // MediaSession API設定
+    if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', playPause);
+        navigator.mediaSession.setActionHandler('pause', playPause);
+        navigator.mediaSession.setActionHandler('nexttrack', playTransitionAndNext);
+    }
+
+    // エラーハンドリング
+    mainAudio.addEventListener('error', (e) => {
+        console.error('Audio playback error:', e);
+        trackInfo.textContent = 'Error playing track: ' + audioFiles[currentTrack];
+    });
+
+    transitionAudio.addEventListener('error', (e) => {
+        console.error('Transition sound error:', e);
+    });
+
+    // 初期トラックのロード
+    loadTrack(currentTrack);
+</script>
 </body>
 </html>
