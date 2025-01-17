@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Player with Transition Sounds</title>
+    <title>Audio Player with Speed Control</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -19,6 +19,7 @@
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-width: 300px;
         }
         button {
             margin: 5px;
@@ -27,8 +28,31 @@
             cursor: pointer;
         }
         #trackInfo {
-            margin-top: 10px;
+            margin: 10px 0;
             font-style: italic;
+        }
+        .speed-control {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+        }
+        .speed-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .speed-control-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input[type="range"] {
+            flex-grow: 1;
+        }
+        #speedValue {
+            min-width: 45px;
+            text-align: right;
         }
     </style>
 </head>
@@ -37,6 +61,20 @@
     <button id="playPauseBtn">Play</button>
     <button id="nextBtn">Next</button>
     <div id="trackInfo"></div>
+    <div class="speed-control">
+        <label>再生速度</label>
+        <div class="speed-control-wrapper">
+            <input
+                    type="range"
+                    id="speedSlider"
+                    min="0.5"
+                    max="2.0"
+                    step="0.1"
+                    value="1.0"
+            >
+            <span id="speedValue">1.0x</span>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -46,8 +84,7 @@
         'audio3.mp3'
     ];
 
-    // トランジション用のSEファイル
-    const transitionSound = 'transition.mp3';  // SEファイルのパス
+    const transitionSound = 'transition.mp3';
 
     let currentTrack = 0;
     let mainAudio = new Audio();
@@ -58,10 +95,24 @@
     const playPauseBtn = document.getElementById('playPauseBtn');
     const nextBtn = document.getElementById('nextBtn');
     const trackInfo = document.getElementById('trackInfo');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
+
+    // 速度調整の処理
+    function updatePlaybackSpeed(speed) {
+        mainAudio.playbackRate = speed;
+        speedValue.textContent = `${speed.toFixed(1)}x`;
+    }
+
+    speedSlider.addEventListener('input', (e) => {
+        updatePlaybackSpeed(parseFloat(e.target.value));
+    });
 
     function loadTrack(index) {
         mainAudio.src = audioFiles[index];
         mainAudio.load();
+        // 速度設定を保持
+        updatePlaybackSpeed(parseFloat(speedSlider.value));
         updateTrackInfo();
     }
 
@@ -80,8 +131,7 @@
         if (isTransitioning) return;
         isTransitioning = true;
 
-        // 現在のトラックをフェードアウト
-        const fadeOutDuration = 1000; // 1秒
+        const fadeOutDuration = 1000;
         const fadeOutInterval = 50;
         const volumeStep = fadeOutInterval / fadeOutDuration;
 
@@ -93,11 +143,9 @@
         mainAudio.pause();
         mainAudio.volume = 1;
 
-        // トランジションSEを再生
         transitionAudio.currentTime = 0;
         try {
             await transitionAudio.play();
-            // SEの再生が終わるのを待つ
             await new Promise(resolve => {
                 transitionAudio.onended = resolve;
             });
@@ -105,7 +153,6 @@
             console.error('Transition sound playback failed:', error);
         }
 
-        // 次のトラックを準備して再生
         currentTrack = (currentTrack + 1) % audioFiles.length;
         loadTrack(currentTrack);
         if (isPlaying) {
@@ -123,11 +170,27 @@
         trackInfo.textContent = `Playing: ${audioFiles[currentTrack]}`;
     }
 
-    // トラック終了時のイベントハンドラ
     mainAudio.addEventListener('ended', playTransitionAndNext);
-
     playPauseBtn.addEventListener('click', playPause);
     nextBtn.addEventListener('click', playTransitionAndNext);
+
+    // キーボードショートカット
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            e.preventDefault();
+            playPause();
+        } else if (e.code === 'ArrowRight') {
+            playTransitionAndNext();
+        } else if (e.code === 'ArrowUp') {
+            const newSpeed = Math.min(2.0, parseFloat(speedSlider.value) + 0.1);
+            speedSlider.value = newSpeed;
+            updatePlaybackSpeed(newSpeed);
+        } else if (e.code === 'ArrowDown') {
+            const newSpeed = Math.max(0.5, parseFloat(speedSlider.value) - 0.1);
+            speedSlider.value = newSpeed;
+            updatePlaybackSpeed(newSpeed);
+        }
+    });
 
     // MediaSession API設定
     if ('mediaSession' in navigator) {
